@@ -84,7 +84,7 @@ export default function CollectionDiscovery() {
                         <p className="mb-3 font-[family-name:var(--font-sans)]
               text-[9px] font-semibold tracking-[0.28em]
               text-[#A5A47A] sm:text-[10px]">
-                            THE PATO EXPERIENCE — 001
+                            THE PATO EXPERIENCE — 002
                         </p>
 
                         <h2 className="font-[family-name:var(--font-editorial)]
@@ -275,7 +275,7 @@ export default function CollectionDiscovery() {
 
                     <span className="font-[family-name:var(--font-sans)]
             text-[8px] tracking-[0.2em] text-[#DBD3AD]/45">
-                        PATO.COM — 001
+                        PATO.COM — 002
                     </span>
 
                 </div>
