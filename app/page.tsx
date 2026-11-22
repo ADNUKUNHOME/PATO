@@ -1,3 +1,4 @@
+import BrandCampaign from "./components/home/brandCampaign";
 import BrandIdentity from "./components/home/brandIdentity";
 import CollectionDiscovery from "./components/home/collectionDiscovery";
 import FeaturedCollection from "./components/home/featuredCollection";
@@ -12,6 +13,7 @@ export default function Home() {
       <FeaturedCollection />
       <BrandIdentity />
       <NewArrivals />
+      <BrandCampaign />
     </main>
   );
 }
