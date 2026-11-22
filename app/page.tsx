@@ -1,9 +1,11 @@
+import CollectionDiscovery from "./components/home/collectionDiscovery";
 import Hero from "./components/home/hero";
 
 export default function Home() {
   return (
-    <div className="flex flex-col w-full h-screen">
+    <main>
       <Hero />
-    </div>
+      <CollectionDiscovery />
+    </main>
   );
 }

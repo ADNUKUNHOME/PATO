@@ -2,7 +2,7 @@ export default function Hero() {
     return (
         <main className="relative flex min-h-svh w-full flex-col
       items-center justify-center overflow-hidden
-      bg-[041005] text-[#DBD3AD]">
+      bg-[#041005] text-[#DBD3AD]">
 
             <div className="flex flex-col items-center">
                 <h1 className="font-serif text-[clamp(5rem,25vw,18.75rem)]
