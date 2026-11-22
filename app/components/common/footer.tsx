@@ -1,6 +1,7 @@
 
 import Link from "next/link";
 import { Cormorant_Garamond, Manrope } from "next/font/google";
+import CopyrightYear from "./copyright-year";
 
 const editorial = Cormorant_Garamond({
     subsets: ["latin"],
@@ -42,8 +43,6 @@ const navigation = [
 ];
 
 export default function Footer() {
-    const year = new Date().getFullYear();
-
     return (
         <footer
             className={`${editorial.variable} ${sans.variable} relative overflow-hidden bg-[#041005] text-[#DBD3AD]`}
@@ -145,7 +144,7 @@ export default function Footer() {
 
                     <div className="relative flex flex-col gap-5 pb-8 sm:flex-row sm:items-center sm:justify-between">
                         <span className="font-[var(--font-footer-sans)] text-[9px] tracking-[0.18em] text-[#DBD3AD]/50">
-                            © {year} PATO.COM. ALL RIGHTS RESERVED.
+                            <CopyrightYear />
                         </span>
 
                         <span className="font-[var(--font-footer-sans)] text-[9px] tracking-[0.18em] text-[#DBD3AD]/50">
