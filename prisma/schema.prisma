@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../app/generated/prisma"
@@ -10,4 +5,411 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// -----------------------------------------------------
+// ENUMS
+// -----------------------------------------------------
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ProductGender {
+  MEN
+  WOMEN
+  UNISEX
+}
+
+enum SizeType {
+  LETTER
+  NUMERIC
+  ONE_SIZE
+  OTHER
+}
+
+enum InventoryMovementType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  RETURN
+}
+
+// -----------------------------------------------------
+// USER MANAGEMENT
+// -----------------------------------------------------
+
+model User {
+  id            String  @id @default(cuid())
+  name          String
+  email         String  @unique
+  emailVerified Boolean @default(false)
+  image         String?
+
+  phone         String? @unique
+  phoneVerified Boolean @default(false)
+
+  // Application roles: customer, admin, super_admin.
+  // Never allow a customer to change this field themselves.
+  role String @default("customer")
+
+  banned     Boolean   @default(false)
+  banReason  String?
+  banExpires DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accounts  Account[]
+  sessions  Session[]
+  addresses Address[]
+
+  inventoryMovements InventoryMovement[] @relation("InventoryMovementActor")
+
+  @@index([role])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Account {
+  id         String @id @default(cuid())
+  accountId  String
+  providerId String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  accessToken  String? @db.Text
+  refreshToken String? @db.Text
+  idToken      String? @db.Text
+
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+
+  scope    String?
+  password String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id    String @id @default(cuid())
+  token String @unique
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?  @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String   @db.Text
+  expiresAt  DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([identifier])
+  @@index([expiresAt])
+  @@map("verifications")
+}
+
+// -----------------------------------------------------
+// CUSTOMER ADDRESSES
+// -----------------------------------------------------
+
+model Address {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  label          String? // Home, Work, etc.
+  fullName       String
+  phone          String
+  alternatePhone String?
+
+  addressLine1 String
+  addressLine2 String?
+  landmark     String?
+
+  city        String
+  state       String
+  postalCode  String
+  countryCode String @default("IN") @db.Char(2)
+
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isDefault])
+  @@map("addresses")
+}
+
+// -----------------------------------------------------
+// PRODUCT CATEGORIES
+// -----------------------------------------------------
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String? @db.Text
+  imageUrl    String?
+
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  // Supports parent categories and subcategories.
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId])
+  @@index([isActive, sortOrder])
+  @@map("categories")
+}
+
+// -----------------------------------------------------
+// PRODUCT MANAGEMENT
+// -----------------------------------------------------
+
+model Product {
+  id String @id @default(cuid())
+
+  name String
+  slug String @unique
+
+  shortDescription String? @db.VarChar(500)
+  description      String? @db.Text
+
+  status ProductStatus @default(DRAFT)
+  gender ProductGender
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  // Common clothing details.
+  material         String?
+  fit              String?
+  careInstructions String? @db.Text
+
+  // Flexible additional product information.
+  // Validate this data in the application with Zod.
+  attributes Json?
+
+  // Search engine metadata.
+  seoTitle       String?
+  seoDescription String? @db.VarChar(320)
+
+  publishedAt DateTime?
+  archivedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images   ProductImage[]
+  variants ProductVariant[]
+
+  @@index([status, createdAt])
+  @@index([categoryId, status])
+  @@index([gender, status])
+  @@map("products")
+}
+
+// -----------------------------------------------------
+// PRODUCT SIZES
+// -----------------------------------------------------
+
+model Size {
+  id String @id @default(cuid())
+
+  name String
+  code String
+  type SizeType @default(LETTER)
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  variants ProductVariant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, code])
+  @@index([isActive, sortOrder])
+  @@map("sizes")
+}
+
+// -----------------------------------------------------
+// PRODUCT COLOURS
+// -----------------------------------------------------
+
+model Color {
+  id String @id @default(cuid())
+
+  name    String
+  slug    String  @unique
+  hexCode String?
+
+  isActive Boolean @default(true)
+
+  variants ProductVariant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("colors")
+}
+
+// -----------------------------------------------------
+// PRODUCT VARIANTS
+// Each size/colour combination is a separate SKU.
+// -----------------------------------------------------
+
+model ProductVariant {
+  id String @id @default(cuid())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  sku String @unique
+
+  sizeId String?
+  size   Size?   @relation(fields: [sizeId], references: [id], onDelete: Restrict)
+
+  colorId String?
+  color   Color?  @relation(fields: [colorId], references: [id], onDelete: Restrict)
+
+  // Store money as decimals, never floating-point numbers.
+  price          Decimal  @db.Decimal(10, 2)
+  compareAtPrice Decimal? @db.Decimal(10, 2)
+  costPrice      Decimal? @db.Decimal(10, 2)
+
+  currency String @default("INR") @db.Char(3)
+
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  inventory Inventory?
+  images    ProductImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, sizeId, colorId])
+  @@index([productId, isActive])
+  @@index([sizeId])
+  @@index([colorId])
+  @@map("product_variants")
+}
+
+// -----------------------------------------------------
+// PRODUCT IMAGES
+// Store image URLs and storage keys, not image files.
+// -----------------------------------------------------
+
+model ProductImage {
+  id String @id @default(cuid())
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Optional: associate an image with a particular variant.
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  url        String  @db.Text
+  storageKey String? @db.Text
+  altText    String?
+
+  sortOrder Int     @default(0)
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, sortOrder])
+  @@index([variantId])
+  @@map("product_images")
+}
+
+// -----------------------------------------------------
+// INVENTORY
+// One inventory record per product variant.
+// -----------------------------------------------------
+
+model Inventory {
+  id String @id @default(cuid())
+
+  variantId String         @unique
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  quantity         Int @default(0)
+  reservedQuantity Int @default(0)
+
+  lowStockThreshold Int @default(3)
+
+  movements InventoryMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("inventory")
+}
+
+// -----------------------------------------------------
+// INVENTORY MOVEMENT HISTORY
+// Keeps a record of stock changes.
+// -----------------------------------------------------
+
+model InventoryMovement {
+  id String @id @default(cuid())
+
+  inventoryId String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  type     InventoryMovementType
+  quantity Int
+  reason   String?
+
+  // Optional reference to an order, return, or adjustment.
+  // These are reference values for now; order models come later.
+  referenceType String?
+  referenceId   String?
+
+  createdByUserId String?
+  createdBy       User?   @relation("InventoryMovementActor", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([inventoryId, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([createdByUserId])
+  @@map("inventory_movements")
 }
