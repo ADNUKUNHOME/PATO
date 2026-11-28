@@ -150,3 +150,24 @@ export const createProductSchema = z
     });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;
+
+
+
+export const productListQuerySchema = z
+    .object({
+        page: z.coerce.number().int().min(1).default(1),
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+
+        search: z.string().trim().max(200).optional(),
+
+        status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
+        gender: z.enum(["MEN", "WOMEN", "UNISEX"]).optional(),
+
+        categoryId: z.string().trim().min(1).optional(),
+
+        sortBy: z.enum(["createdAt", "updatedAt", "name"]).default("createdAt"),
+        sortOrder: z.enum(["asc", "desc"]).default("desc"),
+    })
+    .strict();
+
+export type ProductListQuery = z.infer<typeof productListQuerySchema>;

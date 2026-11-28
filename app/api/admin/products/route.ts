@@ -6,6 +6,211 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin, AuthorizationError } from "@/lib/auth/guards";
 import { createProductSchema } from "@/lib/validations/product";
 
+import { productListQuerySchema } from "@/lib/validations/product";
+
+
+
+export async function GET(request: Request) {
+    try {
+        // 1. Authenticate and authorize the admin.
+        await requireAdmin();
+
+        // 2. Parse and validate query parameters.
+        const searchParams = new URL(request.url).searchParams;
+
+        const queryValidation = productListQuerySchema.safeParse(
+            Object.fromEntries(searchParams.entries()),
+        );
+
+        if (!queryValidation.success) {
+            return NextResponse.json(
+                {
+                    message: "Invalid product query parameters.",
+                    errors: queryValidation.error.flatten(),
+                },
+                { status: 400 },
+            );
+        }
+
+        const {
+            page,
+            limit,
+            search,
+            status,
+            gender,
+            categoryId,
+            sortBy,
+            sortOrder,
+        } = queryValidation.data;
+
+        // 3. Build the database filters.
+        const where: Prisma.ProductWhereInput = {
+            ...(status && { status }),
+            ...(gender && { gender }),
+            ...(categoryId && { categoryId }),
+
+            ...(search && {
+                OR: [
+                    {
+                        name: {
+                            contains: search,
+                            mode: "insensitive",
+                        },
+                    },
+                    {
+                        slug: {
+                            contains: search,
+                            mode: "insensitive",
+                        },
+                    },
+                ],
+            }),
+        };
+
+        // 4. Configure sorting.
+        const orderBy: Prisma.ProductOrderByWithRelationInput =
+            sortBy === "name"
+                ? { name: sortOrder }
+                : sortBy === "updatedAt"
+                    ? { updatedAt: sortOrder }
+                    : { createdAt: sortOrder };
+
+        // 5. Retrieve products and total count.
+        const [products, total] = await Promise.all([
+            prisma.product.findMany({
+                where,
+                skip: (page - 1) * limit,
+                take: limit,
+                orderBy,
+
+                select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    shortDescription: true,
+                    status: true,
+                    gender: true,
+                    categoryId: true,
+                    publishedAt: true,
+                    archivedAt: true,
+                    createdAt: true,
+                    updatedAt: true,
+
+                    category: {
+                        select: {
+                            id: true,
+                            name: true,
+                            slug: true,
+                        },
+                    },
+
+                    _count: {
+                        select: {
+                            variants: true,
+                            images: true,
+                        },
+                    },
+
+                    variants: {
+                        select: {
+                            isActive: true,
+                            price: true,
+
+                            inventory: {
+                                select: {
+                                    quantity: true,
+                                    reservedQuantity: true,
+                                },
+                            },
+                        },
+                    },
+                },
+            }),
+
+            prisma.product.count({ where }),
+        ]);
+
+        // 6. Build useful product summaries.
+        const formattedProducts = products.map((product) => {
+            const activeVariants = product.variants.filter(
+                (variant) => variant.isActive,
+            );
+
+            const prices = activeVariants.map(
+                (variant) => Number(variant.price),
+            );
+
+            const totalStock = product.variants.reduce(
+                (total, variant) =>
+                    total + (variant.inventory?.quantity ?? 0),
+                0,
+            );
+
+            const availableStock = product.variants.reduce(
+                (total, variant) => {
+                    const quantity = variant.inventory?.quantity ?? 0;
+                    const reserved = variant.inventory?.reservedQuantity ?? 0;
+
+                    return total + Math.max(quantity - reserved, 0);
+                },
+                0,
+            );
+
+            const {
+                variants,
+                ...productDetails
+            } = product;
+
+            return {
+                ...productDetails,
+
+                variantCount: product._count.variants,
+                activeVariantCount: activeVariants.length,
+                imageCount: product._count.images,
+
+                totalStock,
+                availableStock,
+
+                minPrice: prices.length > 0 ? Math.min(...prices) : null,
+                maxPrice: prices.length > 0 ? Math.max(...prices) : null,
+            };
+        });
+
+        // 7. Return paginated results.
+        const totalPages = Math.ceil(total / limit);
+
+        return NextResponse.json({
+            message: "Products retrieved successfully.",
+
+            products: formattedProducts,
+
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1,
+            },
+        });
+    } catch (error) {
+        if (error instanceof AuthorizationError) {
+            return NextResponse.json(
+                { message: error.message },
+                { status: error.status },
+            );
+        }
+
+        console.error("Product listing error:", error);
+
+        return NextResponse.json(
+            { message: "An unexpected error occurred while retrieving products." },
+            { status: 500 },
+        );
+    }
+}
+
+
 
 export async function POST(request: Request) {
     try {
